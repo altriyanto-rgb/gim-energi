@@ -262,7 +262,7 @@
       <div class="challenge" id="challengeBox">
         <div class="case-text" id="caseText"></div>
         <div class="answer-row">
-          <input type="number" id="answerInput" placeholder="Jawabanmu (Rp)">
+          <input type="text" inputmode="numeric" id="answerInput" placeholder="Jawabanmu, mis. 22500 atau 22.500">
           <button id="submitAnswer">Cek</button>
         </div>
         <div class="feedback" id="feedbackBox"></div>
@@ -464,8 +464,16 @@ document.getElementById('challengeToggle').addEventListener('click', ()=>{
   if(box.classList.contains('show') && !currentCase) loadCase();
 });
 
+function parseRupiah(str){
+  if(!str) return NaN;
+  // buang semua karakter selain angka (titik, koma, spasi, "Rp" diabaikan)
+  const cleaned = String(str).replace(/[^0-9]/g, '');
+  if(cleaned === '') return NaN;
+  return parseInt(cleaned, 10);
+}
+
 document.getElementById('submitAnswer').addEventListener('click', ()=>{
-  const userAns = parseFloat(document.getElementById('answerInput').value);
+  const userAns = parseRupiah(document.getElementById('answerInput').value);
   const correct = currentCase.calc();
   const fb = document.getElementById('feedbackBox');
   total++;
@@ -485,6 +493,11 @@ document.getElementById('submitAnswer').addEventListener('click', ()=>{
 });
 
 document.getElementById('nextCase').addEventListener('click', loadCase);
+document.getElementById('answerInput').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter' && !document.getElementById('submitAnswer').disabled){
+    document.getElementById('submitAnswer').click();
+  }
+});
 updateScorePanel();
 </script>
 </body>
