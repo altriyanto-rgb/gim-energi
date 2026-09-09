@@ -199,8 +199,18 @@
   .feedback{margin-top:12px; font-size:14px; line-height:1.6; padding:12px; border-radius:10px; display:none;}
   .feedback.ok{display:block; background: rgba(51,217,178,0.12); border:1px solid var(--teal); color: var(--teal);}
   .feedback.bad{display:block; background: rgba(255,93,93,0.12); border:1px solid var(--red); color: var(--red);}
-  .score-line{margin-top:14px; font-size:13px; color: var(--muted);}
-  .score-line span{color: var(--amber); font-family: var(--font-display);}
+  .score-panel{margin-top:16px; padding-top:14px; border-top: 1px solid var(--line);}
+  .score-panel-top{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;}
+  .score-panel-label{font-size:12px; color: var(--muted);}
+  .score-panel-num{font-family: var(--font-display); font-size: 26px; color: var(--amber);}
+  .score-panel-num span{font-size:14px; color: var(--muted);}
+  .score-bar-track{height:10px; background:#0E1526; border-radius:20px; overflow:hidden; border:1px solid var(--line);}
+  .score-bar-fill{height:100%; width:0%; border-radius:20px; background: linear-gradient(90deg, var(--red), var(--amber), var(--teal)); transition: width .3s;}
+  .score-badge{display:inline-block; margin-top:8px; font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px;}
+  .score-badge.low{background: rgba(255,93,93,0.15); color: var(--red);}
+  .score-badge.mid{background: rgba(255,182,39,0.15); color: var(--amber);}
+  .score-badge.high{background: rgba(51,217,178,0.15); color: var(--teal);}
+  .score-detail{margin-top:6px; font-size:12px; color: var(--muted);}
   .next-case{
     margin-top:12px; background:none; border:1px solid var(--line); color:var(--muted);
     padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px; display:none;
@@ -257,7 +267,16 @@
         </div>
         <div class="feedback" id="feedbackBox"></div>
         <button class="next-case" id="nextCase">Soal berikutnya →</button>
-        <div class="score-line">Skor: <span id="scoreVal">0</span> benar dari <span id="scoreTotal">0</span> soal</div>
+
+        <div class="score-panel">
+          <div class="score-panel-top">
+            <span class="score-panel-label">Skor Kamu</span>
+            <span class="score-panel-num" id="scoreVal">0<span> / 100</span></span>
+          </div>
+          <div class="score-bar-track"><div class="score-bar-fill" id="scoreBarFill"></div></div>
+          <div class="score-badge mid" id="scoreBadge">Belum ada jawaban</div>
+          <div class="score-detail" id="scoreDetail">0 benar dari 0 soal</div>
+        </div>
       </div>
     </div>
   </div>
@@ -404,7 +423,30 @@ const cases = [
 ];
 
 let currentCase = null;
-let score = 0, total = 0;
+let correctCount = 0, total = 0;
+let score = 0; // skor 1-100
+
+function updateScorePanel(){
+  document.getElementById('scoreVal').innerHTML = score + '<span> / 100</span>';
+  document.getElementById('scoreBarFill').style.width = score + '%';
+  document.getElementById('scoreDetail').textContent = `${correctCount} benar dari ${total} soal`;
+
+  const badge = document.getElementById('scoreBadge');
+  badge.className = 'score-badge';
+  if(total === 0){
+    badge.classList.add('mid');
+    badge.textContent = 'Belum ada jawaban';
+  } else if(score >= 85){
+    badge.classList.add('high');
+    badge.textContent = '🏆 Sangat Baik';
+  } else if(score >= 60){
+    badge.classList.add('mid');
+    badge.textContent = '👍 Cukup Baik';
+  } else {
+    badge.classList.add('low');
+    badge.textContent = '📖 Perlu Belajar Lagi';
+  }
+}
 
 function loadCase(){
   currentCase = cases[Math.floor(Math.random()*cases.length)];
@@ -428,20 +470,22 @@ document.getElementById('submitAnswer').addEventListener('click', ()=>{
   const fb = document.getElementById('feedbackBox');
   total++;
   if(!isNaN(userAns) && Math.abs(userAns - correct) <= correct*0.02){
-    score++;
+    correctCount++;
+    score = Math.min(100, score + 10);
     fb.className = 'feedback ok';
-    fb.textContent = `✅ Tepat! Biaya yang benar adalah Rp${correct.toLocaleString('id-ID')}.`;
+    fb.textContent = `✅ Tepat! Biaya yang benar adalah Rp${correct.toLocaleString('id-ID')}. Skor +10.`;
   } else {
+    score = Math.max(0, score - 5);
     fb.className = 'feedback bad';
-    fb.textContent = `❌ Belum tepat. Jawaban yang benar adalah Rp${correct.toLocaleString('id-ID')}. Ingat: Energi (kWh) = Daya (kW) × waktu (jam), lalu kalikan dengan tarif dan jumlah hari.`;
+    fb.textContent = `❌ Belum tepat. Jawaban yang benar adalah Rp${correct.toLocaleString('id-ID')}. Ingat: Energi (kWh) = Daya (kW) × waktu (jam), lalu kalikan dengan tarif dan jumlah hari. Skor -5.`;
   }
-  document.getElementById('scoreVal').textContent = score;
-  document.getElementById('scoreTotal').textContent = total;
+  updateScorePanel();
   document.getElementById('nextCase').classList.add('show');
   document.getElementById('submitAnswer').disabled = true;
 });
 
 document.getElementById('nextCase').addEventListener('click', loadCase);
+updateScorePanel();
 </script>
 </body>
 </html>
