@@ -183,6 +183,7 @@
     display:none;
   }
   .challenge.show{display:block;}
+  .case-progress{font-family: var(--font-display); font-size:12px; color: var(--muted); margin-bottom:8px; letter-spacing:0.3px;}
   .case-text{line-height:1.6; font-size:14px; margin-bottom:14px;}
   .case-text b{color: var(--amber);}
   .answer-row{display:flex; gap:10px; flex-wrap:wrap;}
@@ -260,8 +261,9 @@
       <button class="challenge-toggle" id="challengeToggle">🎯 Mulai Tantangan Kasus</button>
 
       <div class="challenge" id="challengeBox">
+        <div class="case-progress" id="caseProgress"></div>
         <div class="case-text" id="caseText"></div>
-        <div class="answer-row">
+        <div class="answer-row" id="answerRow">
           <input type="text" inputmode="numeric" id="answerInput" placeholder="Jawabanmu, mis. 22500 atau 22.500">
           <button id="submitAnswer">Cek</button>
         </div>
@@ -383,48 +385,190 @@ renderAppliances();
 calculate();
 document.getElementById('tarif').addEventListener('input', calculate);
 
-// ---------- MODE TANTANGAN KASUS ----------
-const cases = [
-  {
-    text: "Sebuah rumah menyalakan <b>2 lampu 20 watt</b> selama <b>10 jam/hari</b> dan <b>1 TV 100 watt</b> selama <b>4 jam/hari</b>. Tarif listrik Rp1.500/kWh. Berapa biaya listrik selama <b>30 hari</b>?",
-    calc: () => {
-      const energiHari = (2*20*10 + 1*100*4)/1000;
-      return Math.round(energiHari * 30 * 1500);
-    }
-  },
-  {
-    text: "Kulkas berdaya <b>150 watt</b> menyala terus-menerus <b>24 jam/hari</b>. Jika tarif listrik Rp1.444/kWh, berapa biaya listrik kulkas tersebut selama <b>30 hari</b>?",
-    calc: () => {
-      const energiHari = (150*24)/1000;
-      return Math.round(energiHari * 30 * 1444);
-    }
-  },
-  {
-    text: "Sebuah keluarga memakai <b>rice cooker 400 watt</b> selama <b>1,5 jam/hari</b> dan <b>mesin cuci 300 watt</b> selama <b>1 jam/hari</b>. Tarif listrik Rp1.500/kWh. Hitung biaya listrik untuk kedua alat itu selama <b>30 hari</b>.",
-    calc: () => {
-      const energiHari = (400*1.5 + 300*1)/1000;
-      return Math.round(energiHari * 30 * 1500);
-    }
-  },
-  {
-    text: "AC berdaya <b>900 watt</b> dinyalakan <b>5 jam/hari</b> selama <b>30 hari</b>. Dengan tarif Rp1.500/kWh, berapa total biaya listrik pemakaian AC tersebut?",
-    calc: () => {
-      const energiHari = (900*5)/1000;
-      return Math.round(energiHari * 30 * 1500);
-    }
-  },
-  {
-    text: "Setrika <b>350 watt</b> dipakai <b>1 jam/hari</b> dan pompa air <b>250 watt</b> dipakai <b>2 jam/hari</b>. Tarif listrik Rp1.352/kWh. Berapa biaya listrik gabungan keduanya selama <b>30 hari</b>?",
-    calc: () => {
-      const energiHari = (350*1 + 250*2)/1000;
-      return Math.round(energiHari * 30 * 1352);
-    }
+// ---------- MODE TANTANGAN KASUS (acak, maksimal 10 soal, tanpa pengulangan) ----------
+const MAX_QUESTIONS = 10;
+const tariffBank = [1352, 1444, 1500, 1699];
+const dayBank = [15, 20, 30];
+
+const appBank = [
+  {label:'lampu', icon:'lampu', watts:[5,10,15,20,25]},
+  {label:'kipas angin', watts:[45,55,65,75]},
+  {label:'TV', watts:[80,100,120,150]},
+  {label:'kulkas', watts:[100,120,150,180]},
+  {label:'setrika', watts:[300,350,400]},
+  {label:'rice cooker', watts:[350,400,450]},
+  {label:'mesin cuci', watts:[250,300,350]},
+  {label:'pompa air', watts:[200,250,300]},
+  {label:'AC', watts:[600,900,1000]},
+];
+
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function pickDistinct(arr, n){
+  const copy = [...arr];
+  const result = [];
+  for(let i=0;i<n && copy.length>0;i++){
+    const idx = Math.floor(Math.random()*copy.length);
+    result.push(copy.splice(idx,1)[0]);
   }
+  return result;
+}
+function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+function rp(n){ return 'Rp' + Math.round(n).toLocaleString('id-ID'); }
+
+// Setiap fungsi men-generate 1 soal acak dengan gaya berbeda
+const templates = [
+  // 1 alat, biaya X hari
+  () => {
+    const a = pick(appBank); const watt = pick(a.watts); const hours = randInt(1,10);
+    const days = pick(dayBank); const tarif = pick(tariffBank);
+    const energiHari = (watt*hours)/1000;
+    return {
+      text: `Sebuah <b>${a.label}</b> berdaya <b>${watt} watt</b> digunakan rata-rata <b>${hours} jam/hari</b>. Jika tarif listrik <b>Rp${tarif}/kWh</b>, berapa biaya listriknya selama <b>${days} hari</b>?`,
+      unit: 'rupiah',
+      calc: () => Math.round(energiHari*days*tarif)
+    };
+  },
+  // 2 alat berbeda, biaya gabungan
+  () => {
+    const [a,b] = pickDistinct(appBank,2);
+    const wa = pick(a.watts), wb = pick(b.watts);
+    const ha = randInt(1,8), hb = randInt(1,8);
+    const days = pick(dayBank); const tarif = pick(tariffBank);
+    const energiHari = (wa*ha + wb*hb)/1000;
+    return {
+      text: `Sebuah rumah memakai <b>${a.label} ${wa} watt</b> selama <b>${ha} jam/hari</b> dan <b>${b.label} ${wb} watt</b> selama <b>${hb} jam/hari</b>. Tarif listrik <b>Rp${tarif}/kWh</b>. Berapa total biaya listrik kedua alat itu selama <b>${days} hari</b>?`,
+      unit: 'rupiah',
+      calc: () => Math.round(energiHari*days*tarif)
+    };
+  },
+  // 3 alat berbeda, biaya gabungan
+  () => {
+    const [a,b,c] = pickDistinct(appBank,3);
+    const wa = pick(a.watts), wb = pick(b.watts), wc = pick(c.watts);
+    const ha = randInt(1,6), hb = randInt(1,6), hc = randInt(1,6);
+    const days = pick(dayBank); const tarif = pick(tariffBank);
+    const energiHari = (wa*ha + wb*hb + wc*hc)/1000;
+    return {
+      text: `Di rumah Budi terdapat <b>${a.label} ${wa} watt</b> (${ha} jam/hari), <b>${b.label} ${wb} watt</b> (${hb} jam/hari), dan <b>${c.label} ${wc} watt</b> (${hc} jam/hari). Tarif listrik <b>Rp${tarif}/kWh</b>. Hitung total biaya listrik ketiga alat tersebut selama <b>${days} hari</b>.`,
+      unit: 'rupiah',
+      calc: () => Math.round(energiHari*days*tarif)
+    };
+  },
+  // Alat menyala 24 jam terus-menerus (kulkas-style)
+  () => {
+    const watt = pick([100,120,150,180,200]);
+    const days = pick(dayBank); const tarif = pick(tariffBank);
+    const energiHari = (watt*24)/1000;
+    return {
+      text: `Sebuah kulkas berdaya <b>${watt} watt</b> menyala terus-menerus <b>24 jam/hari</b>. Jika tarif listrik <b>Rp${tarif}/kWh</b>, berapa biaya listrik kulkas tersebut selama <b>${days} hari</b>?`,
+      unit: 'rupiah',
+      calc: () => Math.round(energiHari*days*tarif)
+    };
+  },
+  // Pemakaian mingguan (tidak setiap hari)
+  () => {
+    const a = pick(appBank); const watt = pick(a.watts); const hours = randInt(1,4);
+    const timesPerWeek = randInt(2,5); const weeks = pick([2,4]); const tarif = pick(tariffBank);
+    const totalJam = hours*timesPerWeek*weeks;
+    const energiTotal = (watt*totalJam)/1000;
+    return {
+      text: `Sebuah <b>${a.label} ${watt} watt</b> dipakai <b>${hours} jam</b> setiap kali pakai, sebanyak <b>${timesPerWeek} kali seminggu</b>, selama <b>${weeks} minggu</b>. Tarif listrik <b>Rp${tarif}/kWh</b>. Berapa total biaya listriknya?`,
+      unit: 'rupiah',
+      calc: () => Math.round(energiTotal*tarif)
+    };
+  },
+  // Pertanyaan energi (kWh), bukan biaya
+  () => {
+    const [a,b] = pickDistinct(appBank,2);
+    const wa = pick(a.watts), wb = pick(b.watts);
+    const ha = randInt(1,8), hb = randInt(1,8);
+    const days = pick(dayBank);
+    const energiHari = (wa*ha + wb*hb)/1000;
+    return {
+      text: `Sebuah rumah memakai <b>${a.label} ${wa} watt</b> selama <b>${ha} jam/hari</b> dan <b>${b.label} ${wb} watt</b> selama <b>${hb} jam/hari</b>. Berapa <b>total energi listrik (kWh)</b> yang dipakai selama <b>${days} hari</b>? (Jawab dalam kWh, boleh pakai koma)`,
+      unit: 'kwh',
+      calc: () => Math.round(energiHari*days*10)/10
+    };
+  },
+  // Pemakaian dalam menit, dikonversi ke jam
+  () => {
+    const watt = pick([200,250,300]);
+    const minutesPerDay = pick([30,45,60,90]);
+    const days = pick(dayBank); const tarif = pick(tariffBank);
+    const hoursPerDay = minutesPerDay/60;
+    const energiHari = (watt*hoursPerDay)/1000;
+    return {
+      text: `Pompa air berdaya <b>${watt} watt</b> menyala rata-rata <b>${minutesPerDay} menit setiap hari</b>. Jika tarif listrik <b>Rp${tarif}/kWh</b>, berapa biaya listrik pompa air itu selama <b>${days} hari</b>?`,
+      unit: 'rupiah',
+      calc: () => Math.round(energiHari*days*tarif)
+    };
+  },
+  // Bandingkan sebelum/sesudah ganti alat lebih hemat daya
+  () => {
+    const a = pick(appBank); const wattLama = pick(a.watts);
+    const wattBaru = Math.max(5, wattLama - pick([20,30,50]));
+    const hours = randInt(2,8); const days = pick(dayBank); const tarif = pick(tariffBank);
+    const selisihWatt = wattLama - wattBaru;
+    const hemat = (selisihWatt*hours/1000)*days*tarif;
+    return {
+      text: `Sebuah keluarga mengganti <b>${a.label}</b> lama berdaya <b>${wattLama} watt</b> dengan yang baru berdaya <b>${wattBaru} watt</b>. Alat ini dipakai <b>${hours} jam/hari</b> selama <b>${days} hari</b>, dengan tarif <b>Rp${tarif}/kWh</b>. Berapa <b>penghematan biaya listrik</b> setelah mengganti alat tersebut?`,
+      unit: 'rupiah',
+      calc: () => Math.round(hemat)
+    };
+  },
+  // Menghitung total daya (watt) dari beberapa alat yang menyala bersamaan
+  () => {
+    const items = pickDistinct(appBank, randInt(2,3));
+    const watts = items.map(a => pick(a.watts));
+    const totalWatt = watts.reduce((s,w)=>s+w,0);
+    const listText = items.map((a,i)=> `<b>${a.label} ${watts[i]} watt</b>`).join(', ');
+    return {
+      text: `Jika ${listText} dinyalakan secara bersamaan, berapa <b>total daya listrik (watt)</b> yang digunakan pada saat itu?`,
+      unit: 'watt',
+      calc: () => totalWatt
+    };
+  },
+  // Pemakaian hanya di akhir pekan (2 hari/minggu)
+  () => {
+    const a = pick(appBank); const watt = pick(a.watts); const hours = randInt(2,8);
+    const weeks = pick([2,4]); const tarif = pick(tariffBank);
+    const totalJam = hours*2*weeks; // 2 hari/minggu
+    const energiTotal = (watt*totalJam)/1000;
+    return {
+      text: `Sebuah <b>${a.label} ${watt} watt</b> hanya dipakai saat akhir pekan (Sabtu & Minggu) selama <b>${hours} jam/hari</b>, selama <b>${weeks} minggu</b>. Tarif listrik <b>Rp${tarif}/kWh</b>. Berapa total biaya listriknya?`,
+      unit: 'rupiah',
+      calc: () => Math.round(energiTotal*tarif)
+    };
+  },
 ];
 
 let currentCase = null;
 let correctCount = 0, total = 0;
 let score = 0; // skor 1-100
+let sessionQuestions = [];
+let questionIndex = 0;
+
+function shuffle(arr){
+  const a = [...arr];
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+function parseAngka(str, unit){
+  if(!str) return NaN;
+  if(unit === 'kwh'){
+    const cleaned = String(str).trim().replace(',', '.').replace(/[^0-9.]/g,'');
+    if(cleaned === '') return NaN;
+    return parseFloat(cleaned);
+  }
+  // rupiah & watt: buang semua karakter selain angka
+  const cleaned = String(str).replace(/[^0-9]/g, '');
+  if(cleaned === '') return NaN;
+  return parseInt(cleaned, 10);
+}
 
 function updateScorePanel(){
   document.getElementById('scoreVal').innerHTML = score + '<span> / 100</span>';
@@ -448,51 +592,79 @@ function updateScorePanel(){
   }
 }
 
+function startSession(){
+  sessionQuestions = shuffle(templates).slice(0, MAX_QUESTIONS).map(fn => fn());
+  questionIndex = 0;
+  correctCount = 0; total = 0; score = 0;
+  updateScorePanel();
+  loadCase();
+}
+
 function loadCase(){
-  currentCase = cases[Math.floor(Math.random()*cases.length)];
+  if(questionIndex >= sessionQuestions.length){
+    showSummary();
+    return;
+  }
+  currentCase = sessionQuestions[questionIndex];
+  document.getElementById('caseProgress').textContent = `Soal ${questionIndex+1} dari ${sessionQuestions.length}`;
   document.getElementById('caseText').innerHTML = currentCase.text;
+  document.getElementById('answerInput').placeholder = currentCase.unit === 'kwh' ? 'Jawabanmu, mis. 12,5 (kWh)' : (currentCase.unit === 'watt' ? 'Jawabanmu, mis. 450 (watt)' : 'Jawabanmu, mis. 22500 atau 22.500');
   document.getElementById('answerInput').value = '';
+  document.getElementById('answerRow').style.display = 'flex';
   document.getElementById('feedbackBox').className = 'feedback';
   document.getElementById('feedbackBox').textContent = '';
   document.getElementById('nextCase').classList.remove('show');
+  document.getElementById('nextCase').textContent = 'Soal berikutnya →';
   document.getElementById('submitAnswer').disabled = false;
+}
+
+function showSummary(){
+  document.getElementById('caseProgress').textContent = `Selesai — ${sessionQuestions.length} dari ${sessionQuestions.length} soal`;
+  document.getElementById('caseText').innerHTML = `Tantangan selesai! Kamu menjawab benar <b>${correctCount}</b> dari <b>${total}</b> soal.`;
+  document.getElementById('answerRow').style.display = 'none';
+  document.getElementById('feedbackBox').className = 'feedback';
+  document.getElementById('feedbackBox').textContent = '';
+  document.getElementById('nextCase').classList.add('show');
+  document.getElementById('nextCase').textContent = '🔄 Main Lagi (10 soal baru)';
 }
 
 document.getElementById('challengeToggle').addEventListener('click', ()=>{
   const box = document.getElementById('challengeBox');
   box.classList.toggle('show');
-  if(box.classList.contains('show') && !currentCase) loadCase();
+  if(box.classList.contains('show') && sessionQuestions.length === 0) startSession();
 });
 
-function parseRupiah(str){
-  if(!str) return NaN;
-  // buang semua karakter selain angka (titik, koma, spasi, "Rp" diabaikan)
-  const cleaned = String(str).replace(/[^0-9]/g, '');
-  if(cleaned === '') return NaN;
-  return parseInt(cleaned, 10);
-}
-
 document.getElementById('submitAnswer').addEventListener('click', ()=>{
-  const userAns = parseRupiah(document.getElementById('answerInput').value);
+  const userAns = parseAngka(document.getElementById('answerInput').value, currentCase.unit);
   const correct = currentCase.calc();
   const fb = document.getElementById('feedbackBox');
+  const tolerance = currentCase.unit === 'kwh' ? Math.max(correct*0.05, 0.1) : correct*0.02;
+  const correctLabel = currentCase.unit === 'kwh' ? `${correct} kWh` : (currentCase.unit === 'watt' ? `${correct} watt` : rp(correct));
+
   total++;
-  if(!isNaN(userAns) && Math.abs(userAns - correct) <= correct*0.02){
+  questionIndex++;
+  if(!isNaN(userAns) && Math.abs(userAns - correct) <= tolerance){
     correctCount++;
     score = Math.min(100, score + 10);
     fb.className = 'feedback ok';
-    fb.textContent = `✅ Tepat! Biaya yang benar adalah Rp${correct.toLocaleString('id-ID')}. Skor +10.`;
+    fb.textContent = `✅ Tepat! Jawaban yang benar adalah ${correctLabel}. Skor +10.`;
   } else {
     score = Math.max(0, score - 5);
     fb.className = 'feedback bad';
-    fb.textContent = `❌ Belum tepat. Jawaban yang benar adalah Rp${correct.toLocaleString('id-ID')}. Ingat: Energi (kWh) = Daya (kW) × waktu (jam), lalu kalikan dengan tarif dan jumlah hari. Skor -5.`;
+    fb.textContent = `❌ Belum tepat. Jawaban yang benar adalah ${correctLabel}. Ingat: Energi (kWh) = Daya (kW) × waktu (jam), lalu kalikan dengan tarif dan jumlah hari. Skor -5.`;
   }
   updateScorePanel();
   document.getElementById('nextCase').classList.add('show');
   document.getElementById('submitAnswer').disabled = true;
 });
 
-document.getElementById('nextCase').addEventListener('click', loadCase);
+document.getElementById('nextCase').addEventListener('click', ()=>{
+  if(questionIndex >= sessionQuestions.length && document.getElementById('nextCase').textContent.includes('Main Lagi')){
+    startSession();
+  } else {
+    loadCase();
+  }
+});
 document.getElementById('answerInput').addEventListener('keydown', (e)=>{
   if(e.key === 'Enter' && !document.getElementById('submitAnswer').disabled){
     document.getElementById('submitAnswer').click();
