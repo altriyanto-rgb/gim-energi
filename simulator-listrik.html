@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulator Daya & Energi Listrik</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0E1526;
+    --panel: #16203A;
+    --panel-raised: #1C2A48;
+    --line: #2A3A5C;
+    --text: #EDF0F7;
+    --muted: #8B96B3;
+    --amber: #FFB627;
+    --teal: #33D9B2;
+    --red: #FF5D5D;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: radial-gradient(circle at 15% 0%, #16203A 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: var(--font-body);
+    padding: 28px 16px 60px;
+  }
+  .wrap{max-width: 1100px; margin: 0 auto;}
+
+  header{margin-bottom: 24px;}
+  .eyebrow{color: var(--amber); font-family: var(--font-display); font-size: 13px; letter-spacing: 0.3px;}
+  h1{
+    font-family: var(--font-display);
+    font-size: clamp(28px, 4vw, 40px);
+    margin: 6px 0 8px;
+    line-height: 1.1;
+  }
+  header p{color: var(--muted); max-width: 60ch; line-height: 1.6; margin:0;}
+
+  .breaker-select{
+    display:flex; gap:10px; flex-wrap:wrap; margin: 20px 0 26px;
+  }
+  .breaker-btn{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--text);
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-family: var(--font-display);
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .breaker-btn:hover{border-color: var(--amber);}
+  .breaker-btn.active{background: var(--amber); color: #17130A; border-color: var(--amber);}
+
+  .grid{
+    display:grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 860px){ .grid{grid-template-columns: 1fr;} }
+
+  .panel{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 20px;
+  }
+  .panel h2{
+    font-family: var(--font-display);
+    font-size: 18px;
+    margin: 0 0 14px;
+  }
+
+  .appliance{
+    display:grid;
+    grid-template-columns: 34px 1fr auto;
+    align-items:center;
+    gap: 10px;
+    padding: 10px 8px;
+    border-radius: 10px;
+    margin-bottom: 6px;
+    transition: background .15s;
+  }
+  .appliance.on{background: rgba(255,182,39,0.07);}
+  .appliance .icon{font-size: 20px; text-align:center;}
+  .appliance .name{font-weight:600; font-size:14px;}
+  .appliance .watt{color: var(--muted); font-size:12px;}
+  .appliance .hours-row{
+    grid-column: 1 / -1;
+    display:flex; align-items:center; gap:10px;
+    padding-left: 44px;
+    margin-top: -2px;
+  }
+  .appliance .hours-row input[type=range]{flex:1; accent-color: var(--amber);}
+  .appliance .hours-val{
+    font-family: var(--font-display);
+    font-size: 13px;
+    width: 58px;
+    text-align:right;
+    color: var(--amber);
+  }
+  .toggle{
+    position: relative; width: 40px; height: 22px;
+    background: #2A3A5C; border-radius: 20px; cursor:pointer;
+    flex-shrink:0;
+  }
+  .toggle::after{
+    content:''; position:absolute; top:2px; left:2px;
+    width:18px; height:18px; border-radius:50%;
+    background: var(--muted);
+    transition: transform .15s, background .15s;
+  }
+  .toggle.on{background: rgba(51,217,178,0.25);}
+  .toggle.on::after{transform: translateX(18px); background: var(--teal);}
+
+  .meter-box{text-align:center; padding: 6px 0 16px;}
+  .meter-num{
+    font-family: var(--font-display);
+    font-size: 46px;
+    font-weight:700;
+    color: var(--amber);
+    line-height:1;
+  }
+  .meter-label{color: var(--muted); font-size: 13px; margin-top:4px;}
+  .bar-track{
+    height: 14px; background:#0E1526; border-radius: 20px; overflow:hidden;
+    border: 1px solid var(--line); margin: 14px 0 4px;
+  }
+  .bar-fill{height:100%; background: linear-gradient(90deg, var(--teal), var(--amber)); width:0%; transition: width .25s;}
+  .bar-fill.over{background: var(--red);}
+  .bar-caption{display:flex; justify-content:space-between; font-size:12px; color:var(--muted);}
+
+  .alert{
+    display:none;
+    background: rgba(255,93,93,0.12);
+    border: 1px solid var(--red);
+    color: var(--red);
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight:600;
+    margin-top: 12px;
+  }
+  .alert.show{display:block;}
+
+  .stat-row{
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding: 10px 0; border-top: 1px solid var(--line);
+  }
+  .stat-row:first-of-type{border-top:none;}
+  .stat-label{color: var(--muted); font-size: 13px;}
+  .stat-value{font-family: var(--font-display); font-size: 17px;}
+  .stat-value.big{font-size: 22px; color: var(--teal);}
+
+  .tariff-row{display:flex; align-items:center; gap:10px; margin-top:14px;}
+  .tariff-row label{font-size:12px; color:var(--muted);}
+  .tariff-row input{
+    background:#0E1526; border:1px solid var(--line); color:var(--text);
+    border-radius:8px; padding:6px 10px; width:100px; font-family: var(--font-display);
+  }
+
+  .challenge-toggle{
+    margin-top: 22px;
+    width:100%;
+    background: var(--teal);
+    color: #08201A;
+    border:none;
+    border-radius: 12px;
+    padding: 14px;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight:700;
+    cursor:pointer;
+  }
+
+  .challenge{
+    margin-top: 20px;
+    display:none;
+  }
+  .challenge.show{display:block;}
+  .case-text{line-height:1.6; font-size:14px; margin-bottom:14px;}
+  .case-text b{color: var(--amber);}
+  .answer-row{display:flex; gap:10px; flex-wrap:wrap;}
+  .answer-row input{
+    flex:1; min-width:160px;
+    background:#0E1526; border:1px solid var(--line); color:var(--text);
+    border-radius:8px; padding:10px 12px; font-family: var(--font-display); font-size:15px;
+  }
+  .answer-row button{
+    background: var(--amber); border:none; color:#17130A;
+    padding: 10px 18px; border-radius: 8px; font-family: var(--font-display);
+    font-weight:700; cursor:pointer;
+  }
+  .feedback{margin-top:12px; font-size:14px; line-height:1.6; padding:12px; border-radius:10px; display:none;}
+  .feedback.ok{display:block; background: rgba(51,217,178,0.12); border:1px solid var(--teal); color: var(--teal);}
+  .feedback.bad{display:block; background: rgba(255,93,93,0.12); border:1px solid var(--red); color: var(--red);}
+  .score-line{margin-top:14px; font-size:13px; color: var(--muted);}
+  .score-line span{color: var(--amber); font-family: var(--font-display);}
+  .next-case{
+    margin-top:12px; background:none; border:1px solid var(--line); color:var(--muted);
+    padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px; display:none;
+  }
+  .next-case.show{display:inline-block;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">SIMULATOR RUMAH TANGGA</div>
+    <h1>Panel Daya & Energi Listrik</h1>
+    <p>Nyalakan alat-alat listrik di rumahmu, awasi meterannya jangan sampai MCB jeglek, lalu uji pemahamanmu lewat kasus perhitungan biaya listrik.</p>
+  </header>
+
+  <div class="breaker-select" id="breakerSelect">
+    <button class="breaker-btn" data-va="900">MCB 900 VA</button>
+    <button class="breaker-btn active" data-va="1300">MCB 1300 VA</button>
+    <button class="breaker-btn" data-va="2200">MCB 2200 VA</button>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Alat Listrik di Rumah</h2>
+      <div id="applianceList"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Meteran Listrik</h2>
+      <div class="meter-box">
+        <div class="meter-num" id="totalWatt">0 W</div>
+        <div class="meter-label">Total daya tersambung saat ini</div>
+        <div class="bar-track"><div class="bar-fill" id="barFill"></div></div>
+        <div class="bar-caption"><span>0 VA</span><span id="vaCapLabel">1300 VA</span></div>
+        <div class="alert" id="tripAlert">⚡ MCB JEGLEK! Total daya melebihi kapasitas terpasang — beberapa alat otomatis dimatikan.</div>
+      </div>
+
+      <div class="stat-row"><span class="stat-label">Energi per hari</span><span class="stat-value" id="energiHari">0 kWh</span></div>
+      <div class="stat-row"><span class="stat-label">Energi per bulan (30 hari)</span><span class="stat-value" id="energiBulan">0 kWh</span></div>
+      <div class="stat-row"><span class="stat-label">Perkiraan biaya bulanan</span><span class="stat-value big" id="biayaBulan">Rp0</span></div>
+
+      <div class="tariff-row">
+        <label for="tarif">Tarif (Rp/kWh)</label>
+        <input type="number" id="tarif" value="1500" min="0" step="50">
+      </div>
+
+      <button class="challenge-toggle" id="challengeToggle">🎯 Mulai Tantangan Kasus</button>
+
+      <div class="challenge" id="challengeBox">
+        <div class="case-text" id="caseText"></div>
+        <div class="answer-row">
+          <input type="number" id="answerInput" placeholder="Jawabanmu (Rp)">
+          <button id="submitAnswer">Cek</button>
+        </div>
+        <div class="feedback" id="feedbackBox"></div>
+        <button class="next-case" id="nextCase">Soal berikutnya →</button>
+        <div class="score-line">Skor: <span id="scoreVal">0</span> benar dari <span id="scoreTotal">0</span> soal</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const appliances = [
+  {id:'led', name:'Lampu LED', icon:'💡', watt:10, hours:6},
+  {id:'pijar', name:'Lampu Pijar', icon:'🔦', watt:100, hours:0},
+  {id:'kipas', name:'Kipas Angin', icon:'🌀', watt:75, hours:0},
+  {id:'tv', name:'TV', icon:'📺', watt:120, hours:0},
+  {id:'kulkas', name:'Kulkas', icon:'🧊', watt:150, hours:0},
+  {id:'setrika', name:'Setrika', icon:'👕', watt:350, hours:0},
+  {id:'ricecooker', name:'Rice Cooker', icon:'🍚', watt:400, hours:0},
+  {id:'mesincuci', name:'Mesin Cuci', icon:'🧺', watt:300, hours:0},
+  {id:'pompa', name:'Pompa Air', icon:'🚰', watt:250, hours:0},
+  {id:'ac', name:'AC', icon:'❄️', watt:900, hours:0},
+];
+
+let capacityVA = 1300;
+let tripped = false;
+
+const listEl = document.getElementById('applianceList');
+
+function renderAppliances(){
+  listEl.innerHTML = '';
+  appliances.forEach(a=>{
+    const isOn = a.hours > 0;
+    const row = document.createElement('div');
+    row.className = 'appliance' + (isOn ? ' on' : '');
+    row.innerHTML = `
+      <div class="icon">${a.icon}</div>
+      <div>
+        <div class="name">${a.name}</div>
+        <div class="watt">${a.watt} W</div>
+      </div>
+      <div class="toggle ${isOn ? 'on' : ''}" data-id="${a.id}"></div>
+      <div class="hours-row">
+        <input type="range" min="0" max="24" step="0.5" value="${a.hours}" data-id="${a.id}">
+        <div class="hours-val">${a.hours} jam</div>
+      </div>
+    `;
+    listEl.appendChild(row);
+  });
+
+  listEl.querySelectorAll('.toggle').forEach(t=>{
+    t.addEventListener('click', ()=>{
+      const a = appliances.find(x=>x.id===t.dataset.id);
+      a.hours = a.hours > 0 ? 0 : 2;
+      renderAppliances();
+      calculate();
+    });
+  });
+  listEl.querySelectorAll('input[type=range]').forEach(r=>{
+    r.addEventListener('input', ()=>{
+      const a = appliances.find(x=>x.id===r.dataset.id);
+      a.hours = parseFloat(r.value);
+      r.closest('.appliance').classList.toggle('on', a.hours > 0);
+      r.closest('.appliance').querySelector('.hours-val').textContent = a.hours + ' jam';
+      r.closest('.appliance').querySelector('.toggle').classList.toggle('on', a.hours > 0);
+      calculate();
+    });
+  });
+}
+
+document.getElementById('breakerSelect').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.breaker-btn');
+  if(!btn) return;
+  document.querySelectorAll('.breaker-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  capacityVA = parseInt(btn.dataset.va);
+  document.getElementById('vaCapLabel').textContent = capacityVA + ' VA';
+  tripped = false;
+  calculate();
+});
+
+function calculate(){
+  const totalWatt = appliances.reduce((sum,a)=> a.hours>0 ? sum + a.watt : sum, 0);
+  const energiHari = appliances.reduce((sum,a)=> sum + (a.watt * a.hours)/1000, 0);
+  const energiBulan = energiHari * 30;
+  const tarif = parseFloat(document.getElementById('tarif').value) || 0;
+  const biaya = energiBulan * tarif;
+
+  document.getElementById('totalWatt').textContent = totalWatt.toLocaleString('id-ID') + ' W';
+  document.getElementById('energiHari').textContent = energiHari.toFixed(2) + ' kWh';
+  document.getElementById('energiBulan').textContent = energiBulan.toFixed(1) + ' kWh';
+  document.getElementById('biayaBulan').textContent = 'Rp' + Math.round(biaya).toLocaleString('id-ID');
+
+  const pct = Math.min((totalWatt / capacityVA) * 100, 100);
+  const fill = document.getElementById('barFill');
+  fill.style.width = pct + '%';
+
+  const alertBox = document.getElementById('tripAlert');
+  if(totalWatt > capacityVA){
+    fill.classList.add('over');
+    alertBox.classList.add('show');
+  } else {
+    fill.classList.remove('over');
+    alertBox.classList.remove('show');
+  }
+}
+
+renderAppliances();
+calculate();
+document.getElementById('tarif').addEventListener('input', calculate);
+
+// ---------- MODE TANTANGAN KASUS ----------
+const cases = [
+  {
+    text: "Sebuah rumah menyalakan <b>2 lampu 20 watt</b> selama <b>10 jam/hari</b> dan <b>1 TV 100 watt</b> selama <b>4 jam/hari</b>. Tarif listrik Rp1.500/kWh. Berapa biaya listrik selama <b>30 hari</b>?",
+    calc: () => {
+      const energiHari = (2*20*10 + 1*100*4)/1000;
+      return Math.round(energiHari * 30 * 1500);
+    }
+  },
+  {
+    text: "Kulkas berdaya <b>150 watt</b> menyala terus-menerus <b>24 jam/hari</b>. Jika tarif listrik Rp1.444/kWh, berapa biaya listrik kulkas tersebut selama <b>30 hari</b>?",
+    calc: () => {
+      const energiHari = (150*24)/1000;
+      return Math.round(energiHari * 30 * 1444);
+    }
+  },
+  {
+    text: "Sebuah keluarga memakai <b>rice cooker 400 watt</b> selama <b>1,5 jam/hari</b> dan <b>mesin cuci 300 watt</b> selama <b>1 jam/hari</b>. Tarif listrik Rp1.500/kWh. Hitung biaya listrik untuk kedua alat itu selama <b>30 hari</b>.",
+    calc: () => {
+      const energiHari = (400*1.5 + 300*1)/1000;
+      return Math.round(energiHari * 30 * 1500);
+    }
+  },
+  {
+    text: "AC berdaya <b>900 watt</b> dinyalakan <b>5 jam/hari</b> selama <b>30 hari</b>. Dengan tarif Rp1.500/kWh, berapa total biaya listrik pemakaian AC tersebut?",
+    calc: () => {
+      const energiHari = (900*5)/1000;
+      return Math.round(energiHari * 30 * 1500);
+    }
+  },
+  {
+    text: "Setrika <b>350 watt</b> dipakai <b>1 jam/hari</b> dan pompa air <b>250 watt</b> dipakai <b>2 jam/hari</b>. Tarif listrik Rp1.352/kWh. Berapa biaya listrik gabungan keduanya selama <b>30 hari</b>?",
+    calc: () => {
+      const energiHari = (350*1 + 250*2)/1000;
+      return Math.round(energiHari * 30 * 1352);
+    }
+  }
+];
+
+let currentCase = null;
+let score = 0, total = 0;
+
+function loadCase(){
+  currentCase = cases[Math.floor(Math.random()*cases.length)];
+  document.getElementById('caseText').innerHTML = currentCase.text;
+  document.getElementById('answerInput').value = '';
+  document.getElementById('feedbackBox').className = 'feedback';
+  document.getElementById('feedbackBox').textContent = '';
+  document.getElementById('nextCase').classList.remove('show');
+  document.getElementById('submitAnswer').disabled = false;
+}
+
+document.getElementById('challengeToggle').addEventListener('click', ()=>{
+  const box = document.getElementById('challengeBox');
+  box.classList.toggle('show');
+  if(box.classList.contains('show') && !currentCase) loadCase();
+});
+
+document.getElementById('submitAnswer').addEventListener('click', ()=>{
+  const userAns = parseFloat(document.getElementById('answerInput').value);
+  const correct = currentCase.calc();
+  const fb = document.getElementById('feedbackBox');
+  total++;
+  if(!isNaN(userAns) && Math.abs(userAns - correct) <= correct*0.02){
+    score++;
+    fb.className = 'feedback ok';
+    fb.textContent = `✅ Tepat! Biaya yang benar adalah Rp${correct.toLocaleString('id-ID')}.`;
+  } else {
+    fb.className = 'feedback bad';
+    fb.textContent = `❌ Belum tepat. Jawaban yang benar adalah Rp${correct.toLocaleString('id-ID')}. Ingat: Energi (kWh) = Daya (kW) × waktu (jam), lalu kalikan dengan tarif dan jumlah hari.`;
+  }
+  document.getElementById('scoreVal').textContent = score;
+  document.getElementById('scoreTotal').textContent = total;
+  document.getElementById('nextCase').classList.add('show');
+  document.getElementById('submitAnswer').disabled = true;
+});
+
+document.getElementById('nextCase').addEventListener('click', loadCase);
+</script>
+</body>
+</html>
