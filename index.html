@@ -183,10 +183,19 @@
     display:none;
   }
   .challenge.show{display:block;}
-  .case-progress{font-family: var(--font-display); font-size:12px; color: var(--muted); margin-bottom:8px; letter-spacing:0.3px;}
+  .case-top-row{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
+  .case-progress{font-family: var(--font-display); font-size:12px; color: var(--muted); letter-spacing:0.3px;}
+  .case-timer{font-family: var(--font-display); font-size:13px; font-weight:700; color: var(--teal);}
+  .case-timer.warn{color: var(--amber);}
+  .case-timer.danger{color: var(--red);}
+  .timer-bar-track{height:6px; background:#0E1526; border-radius:20px; overflow:hidden; border:1px solid var(--line); margin-bottom:12px;}
+  .timer-bar-fill{height:100%; width:100%; background: var(--teal); transition: width 1s linear, background .3s;}
+  .timer-bar-fill.warn{background: var(--amber);}
+  .timer-bar-fill.danger{background: var(--red);}
   .case-text{line-height:1.6; font-size:14px; margin-bottom:14px;}
   .case-text b{color: var(--amber);}
   .answer-row{display:flex; gap:10px; flex-wrap:wrap;}
+  .answer-hint{font-size:11px; color: var(--muted); margin-top:6px;}
   .answer-row input{
     flex:1; min-width:160px;
     background:#0E1526; border:1px solid var(--line); color:var(--text);
@@ -261,12 +270,16 @@
       <button class="challenge-toggle" id="challengeToggle">🎯 Mulai Tantangan Kasus</button>
 
       <div class="challenge" id="challengeBox">
-        <div class="case-progress" id="caseProgress"></div>
+        <div class="case-top-row">
+          <div class="case-progress" id="caseProgress"></div>
+          <div class="case-timer" id="caseTimer">⏱ 2:00</div>
+        </div>
+        <div class="timer-bar-track"><div class="timer-bar-fill" id="timerBarFill"></div></div>
         <div class="case-text" id="caseText"></div>
         <div class="answer-row" id="answerRow">
           <input type="text" inputmode="numeric" id="answerInput" placeholder="Jawabanmu, mis. 22500 atau 22.500">
-          <button id="submitAnswer">Cek</button>
         </div>
+        <div class="answer-hint">Tekan Enter / Done pada keyboard untuk mengirim jawaban</div>
         <div class="feedback" id="feedbackBox"></div>
         <button class="next-case" id="nextCase">Soal berikutnya →</button>
 
@@ -592,6 +605,64 @@ function updateScorePanel(){
   }
 }
 
+const QUESTION_TIME = 120; // 2 menit per soal
+let timerInterval = null;
+let timeLeft = QUESTION_TIME;
+
+function clearTimer(){
+  if(timerInterval){ clearInterval(timerInterval); timerInterval = null; }
+}
+
+function updateTimerDisplay(){
+  const mm = Math.floor(timeLeft/60);
+  const ss = String(timeLeft%60).padStart(2,'0');
+  const timerEl = document.getElementById('caseTimer');
+  const fillEl = document.getElementById('timerBarFill');
+  timerEl.textContent = `⏱ ${mm}:${ss}`;
+  fillEl.style.width = (timeLeft/QUESTION_TIME*100) + '%';
+
+  timerEl.classList.remove('warn','danger');
+  fillEl.classList.remove('warn','danger');
+  if(timeLeft <= 20){
+    timerEl.classList.add('danger'); fillEl.classList.add('danger');
+  } else if(timeLeft <= 60){
+    timerEl.classList.add('warn'); fillEl.classList.add('warn');
+  }
+}
+
+function startTimer(){
+  clearTimer();
+  timeLeft = QUESTION_TIME;
+  updateTimerDisplay();
+  timerInterval = setInterval(()=>{
+    timeLeft--;
+    updateTimerDisplay();
+    if(timeLeft <= 0){
+      clearTimer();
+      handleTimeUp();
+    }
+  }, 1000);
+}
+
+function handleTimeUp(){
+  const correct = currentCase.calc();
+  const correctLabel = currentCase.unit === 'kwh' ? `${correct} kWh` : (currentCase.unit === 'watt' ? `${correct} watt` : rp(correct));
+  const fb = document.getElementById('feedbackBox');
+
+  total++;
+  questionIndex++;
+  score = Math.max(0, score - 5);
+  fb.className = 'feedback bad';
+  fb.textContent = `Waktu habis! Jawaban yang benar adalah ${correctLabel}. Skor -5. Lanjut ke soal berikutnya...`;
+  document.getElementById('answerInput').disabled = true;
+  updateScorePanel();
+
+  setTimeout(()=>{
+    document.getElementById('answerInput').disabled = false;
+    loadCase();
+  }, 2500);
+}
+
 function startSession(){
   sessionQuestions = shuffle(templates).slice(0, MAX_QUESTIONS).map(fn => fn());
   questionIndex = 0;
@@ -601,6 +672,7 @@ function startSession(){
 }
 
 function loadCase(){
+  clearTimer();
   if(questionIndex >= sessionQuestions.length){
     showSummary();
     return;
@@ -615,10 +687,17 @@ function loadCase(){
   document.getElementById('feedbackBox').textContent = '';
   document.getElementById('nextCase').classList.remove('show');
   document.getElementById('nextCase').textContent = 'Soal berikutnya →';
-  document.getElementById('submitAnswer').disabled = false;
+  document.getElementById('answerInput').disabled = false;
+  document.getElementById('answerInput').focus();
+  document.getElementById('caseTimer').style.display = 'block';
+  document.querySelector('.timer-bar-track').style.display = 'block';
+  startTimer();
 }
 
 function showSummary(){
+  clearTimer();
+  document.getElementById('caseTimer').style.display = 'none';
+  document.querySelector('.timer-bar-track').style.display = 'none';
   document.getElementById('caseProgress').textContent = `Selesai — ${sessionQuestions.length} dari ${sessionQuestions.length} soal`;
   document.getElementById('caseText').innerHTML = `Tantangan selesai! Kamu menjawab benar <b>${correctCount}</b> dari <b>${total}</b> soal.`;
   document.getElementById('answerRow').style.display = 'none';
@@ -631,11 +710,20 @@ function showSummary(){
 document.getElementById('challengeToggle').addEventListener('click', ()=>{
   const box = document.getElementById('challengeBox');
   box.classList.toggle('show');
-  if(box.classList.contains('show') && sessionQuestions.length === 0) startSession();
+  if(box.classList.contains('show') && sessionQuestions.length === 0){
+    startSession();
+  } else if(!box.classList.contains('show')){
+    clearTimer();
+  }
 });
 
-document.getElementById('submitAnswer').addEventListener('click', ()=>{
-  const userAns = parseAngka(document.getElementById('answerInput').value, currentCase.unit);
+function submitCurrentAnswer(){
+  const answerInput = document.getElementById('answerInput');
+  if(answerInput.disabled) return;
+  if(answerInput.value.trim() === '') return; // jangan submit kosong
+
+  clearTimer();
+  const userAns = parseAngka(answerInput.value, currentCase.unit);
   const correct = currentCase.calc();
   const fb = document.getElementById('feedbackBox');
   const tolerance = currentCase.unit === 'kwh' ? Math.max(correct*0.05, 0.1) : correct*0.02;
@@ -643,20 +731,26 @@ document.getElementById('submitAnswer').addEventListener('click', ()=>{
 
   total++;
   questionIndex++;
-  if(!isNaN(userAns) && Math.abs(userAns - correct) <= tolerance){
+  const isCorrect = !isNaN(userAns) && Math.abs(userAns - correct) <= tolerance;
+  answerInput.disabled = true;
+
+  if(isCorrect){
     correctCount++;
     score = Math.min(100, score + 10);
     fb.className = 'feedback ok';
-    fb.textContent = `✅ Tepat! Jawaban yang benar adalah ${correctLabel}. Skor +10.`;
+    fb.textContent = `Tepat! Jawaban yang benar adalah ${correctLabel}. Skor +10.`;
+    updateScorePanel();
+    document.getElementById('nextCase').classList.add('show');
   } else {
     score = Math.max(0, score - 5);
     fb.className = 'feedback bad';
-    fb.textContent = `❌ Belum tepat. Jawaban yang benar adalah ${correctLabel}. Ingat: Energi (kWh) = Daya (kW) × waktu (jam), lalu kalikan dengan tarif dan jumlah hari. Skor -5.`;
+    fb.textContent = `Belum tepat. Jawaban yang benar adalah ${correctLabel}. Ingat: Energi (kWh) = Daya (kW) × waktu (jam), lalu kalikan dengan tarif dan jumlah hari. Skor -5. Lanjut ke soal berikutnya...`;
+    updateScorePanel();
+    setTimeout(()=>{
+      loadCase();
+    }, 2500);
   }
-  updateScorePanel();
-  document.getElementById('nextCase').classList.add('show');
-  document.getElementById('submitAnswer').disabled = true;
-});
+}
 
 document.getElementById('nextCase').addEventListener('click', ()=>{
   if(questionIndex >= sessionQuestions.length && document.getElementById('nextCase').textContent.includes('Main Lagi')){
@@ -666,8 +760,9 @@ document.getElementById('nextCase').addEventListener('click', ()=>{
   }
 });
 document.getElementById('answerInput').addEventListener('keydown', (e)=>{
-  if(e.key === 'Enter' && !document.getElementById('submitAnswer').disabled){
-    document.getElementById('submitAnswer').click();
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    submitCurrentAnswer();
   }
 });
 updateScorePanel();
