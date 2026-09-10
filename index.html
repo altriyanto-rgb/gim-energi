@@ -185,6 +185,9 @@
   .challenge.show{display:block;}
   .case-top-row{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
   .case-progress{font-family: var(--font-display); font-size:12px; color: var(--muted); letter-spacing:0.3px;}
+  .case-progress.level-mudah{color: var(--teal);}
+  .case-progress.level-sedang{color: var(--amber);}
+  .case-progress.level-sulit{color: var(--red);}
   .case-timer{font-family: var(--font-display); font-size:13px; font-weight:700; color: var(--teal);}
   .case-timer.warn{color: var(--amber);}
   .case-timer.danger{color: var(--red);}
@@ -209,6 +212,16 @@
   .feedback{margin-top:12px; font-size:14px; line-height:1.6; padding:12px; border-radius:10px; display:none;}
   .feedback.ok{display:block; background: rgba(51,217,178,0.12); border:1px solid var(--teal); color: var(--teal);}
   .feedback.bad{display:block; background: rgba(255,93,93,0.12); border:1px solid var(--red); color: var(--red);}
+  .breakdown-box{
+    display:none; margin-top:10px; padding:12px 14px;
+    background:#0E1526; border:1px solid var(--line); border-radius:10px;
+    font-size:12.5px; line-height:1.9; color: var(--muted);
+  }
+  .breakdown-box.show{display:block;}
+  .breakdown-box .breakdown-title{
+    font-family: var(--font-display); font-size:12px; color: var(--teal);
+    margin-bottom:6px; letter-spacing:0.3px;
+  }
   .score-panel{margin-top:16px; padding-top:14px; border-top: 1px solid var(--line);}
   .score-panel-top{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;}
   .score-panel-label{font-size:12px; color: var(--muted);}
@@ -281,6 +294,7 @@
         </div>
         <div class="answer-hint">Tekan Enter / Done pada keyboard untuk mengirim jawaban</div>
         <div class="feedback" id="feedbackBox"></div>
+        <div class="breakdown-box" id="breakdownBox"></div>
         <button class="next-case" id="nextCase">Soal berikutnya →</button>
 
         <div class="score-panel">
@@ -430,56 +444,80 @@ function rp(n){ return 'Rp' + Math.round(n).toLocaleString('id-ID'); }
 
 // Setiap fungsi men-generate 1 soal acak dengan gaya berbeda
 const templates = [
-  // 1 alat, biaya X hari
-  () => {
+  // 1 alat, biaya X hari — MUDAH
+  {level: 'mudah', gen: () => {
     const a = pick(appBank); const watt = pick(a.watts); const hours = randInt(1,10);
     const days = pick(dayBank); const tarif = pick(tariffBank);
     const energiHari = (watt*hours)/1000;
     return {
       text: `Sebuah <b>${a.label}</b> berdaya <b>${watt} watt</b> digunakan rata-rata <b>${hours} jam/hari</b>. Jika tarif listrik <b>Rp${tarif}/kWh</b>, berapa biaya listriknya selama <b>${days} hari</b>?`,
       unit: 'rupiah',
-      calc: () => Math.round(energiHari*days*tarif)
+      calc: () => Math.round(energiHari*days*tarif),
+      breakdown: () => `
+        1) Ubah daya ke kW: ${watt} W = ${watt/1000} kW<br>
+        2) Energi per hari = ${watt/1000} kW × ${hours} jam = ${energiHari} kWh<br>
+        3) Energi ${days} hari = ${energiHari} kWh × ${days} = ${(energiHari*days).toFixed(2)} kWh<br>
+        4) Biaya = ${(energiHari*days).toFixed(2)} kWh × Rp${tarif} = ${rp(energiHari*days*tarif)}`
     };
-  },
-  // 2 alat berbeda, biaya gabungan
-  () => {
+  }},
+  // 2 alat berbeda, biaya gabungan — SEDANG
+  {level: 'sedang', gen: () => {
     const [a,b] = pickDistinct(appBank,2);
     const wa = pick(a.watts), wb = pick(b.watts);
     const ha = randInt(1,8), hb = randInt(1,8);
     const days = pick(dayBank); const tarif = pick(tariffBank);
-    const energiHari = (wa*ha + wb*hb)/1000;
+    const eA = wa*ha/1000, eB = wb*hb/1000;
+    const energiHari = eA + eB;
     return {
       text: `Sebuah rumah memakai <b>${a.label} ${wa} watt</b> selama <b>${ha} jam/hari</b> dan <b>${b.label} ${wb} watt</b> selama <b>${hb} jam/hari</b>. Tarif listrik <b>Rp${tarif}/kWh</b>. Berapa total biaya listrik kedua alat itu selama <b>${days} hari</b>?`,
       unit: 'rupiah',
-      calc: () => Math.round(energiHari*days*tarif)
+      calc: () => Math.round(energiHari*days*tarif),
+      breakdown: () => `
+        1) Energi ${a.label}/hari = ${wa/1000} kW × ${ha} jam = ${eA.toFixed(3)} kWh<br>
+        2) Energi ${b.label}/hari = ${wb/1000} kW × ${hb} jam = ${eB.toFixed(3)} kWh<br>
+        3) Total energi/hari = ${eA.toFixed(3)} + ${eB.toFixed(3)} = ${energiHari.toFixed(3)} kWh<br>
+        4) Energi ${days} hari = ${energiHari.toFixed(3)} × ${days} = ${(energiHari*days).toFixed(2)} kWh<br>
+        5) Biaya = ${(energiHari*days).toFixed(2)} kWh × Rp${tarif} = ${rp(energiHari*days*tarif)}`
     };
-  },
-  // 3 alat berbeda, biaya gabungan
-  () => {
+  }},
+  // 3 alat berbeda, biaya gabungan — SULIT
+  {level: 'sulit', gen: () => {
     const [a,b,c] = pickDistinct(appBank,3);
     const wa = pick(a.watts), wb = pick(b.watts), wc = pick(c.watts);
     const ha = randInt(1,6), hb = randInt(1,6), hc = randInt(1,6);
     const days = pick(dayBank); const tarif = pick(tariffBank);
-    const energiHari = (wa*ha + wb*hb + wc*hc)/1000;
+    const eA = wa*ha/1000, eB = wb*hb/1000, eC = wc*hc/1000;
+    const energiHari = eA + eB + eC;
     return {
       text: `Di rumah Budi terdapat <b>${a.label} ${wa} watt</b> (${ha} jam/hari), <b>${b.label} ${wb} watt</b> (${hb} jam/hari), dan <b>${c.label} ${wc} watt</b> (${hc} jam/hari). Tarif listrik <b>Rp${tarif}/kWh</b>. Hitung total biaya listrik ketiga alat tersebut selama <b>${days} hari</b>.`,
       unit: 'rupiah',
-      calc: () => Math.round(energiHari*days*tarif)
+      calc: () => Math.round(energiHari*days*tarif),
+      breakdown: () => `
+        1) Energi ${a.label}/hari = ${wa/1000} kW × ${ha} jam = ${eA.toFixed(3)} kWh<br>
+        2) Energi ${b.label}/hari = ${wb/1000} kW × ${hb} jam = ${eB.toFixed(3)} kWh<br>
+        3) Energi ${c.label}/hari = ${wc/1000} kW × ${hc} jam = ${eC.toFixed(3)} kWh<br>
+        4) Total energi/hari = ${eA.toFixed(3)} + ${eB.toFixed(3)} + ${eC.toFixed(3)} = ${energiHari.toFixed(3)} kWh<br>
+        5) Energi ${days} hari = ${energiHari.toFixed(3)} × ${days} = ${(energiHari*days).toFixed(2)} kWh<br>
+        6) Biaya = ${(energiHari*days).toFixed(2)} kWh × Rp${tarif} = ${rp(energiHari*days*tarif)}`
     };
-  },
-  // Alat menyala 24 jam terus-menerus (kulkas-style)
-  () => {
+  }},
+  // Alat menyala 24 jam terus-menerus (kulkas-style) — MUDAH
+  {level: 'mudah', gen: () => {
     const watt = pick([100,120,150,180,200]);
     const days = pick(dayBank); const tarif = pick(tariffBank);
     const energiHari = (watt*24)/1000;
     return {
       text: `Sebuah kulkas berdaya <b>${watt} watt</b> menyala terus-menerus <b>24 jam/hari</b>. Jika tarif listrik <b>Rp${tarif}/kWh</b>, berapa biaya listrik kulkas tersebut selama <b>${days} hari</b>?`,
       unit: 'rupiah',
-      calc: () => Math.round(energiHari*days*tarif)
+      calc: () => Math.round(energiHari*days*tarif),
+      breakdown: () => `
+        1) Energi per hari = ${watt/1000} kW × 24 jam = ${energiHari} kWh<br>
+        2) Energi ${days} hari = ${energiHari} × ${days} = ${(energiHari*days).toFixed(2)} kWh<br>
+        3) Biaya = ${(energiHari*days).toFixed(2)} kWh × Rp${tarif} = ${rp(energiHari*days*tarif)}`
     };
-  },
-  // Pemakaian mingguan (tidak setiap hari)
-  () => {
+  }},
+  // Pemakaian mingguan (tidak setiap hari) — SULIT
+  {level: 'sulit', gen: () => {
     const a = pick(appBank); const watt = pick(a.watts); const hours = randInt(1,4);
     const timesPerWeek = randInt(2,5); const weeks = pick([2,4]); const tarif = pick(tariffBank);
     const totalJam = hours*timesPerWeek*weeks;
@@ -487,24 +525,34 @@ const templates = [
     return {
       text: `Sebuah <b>${a.label} ${watt} watt</b> dipakai <b>${hours} jam</b> setiap kali pakai, sebanyak <b>${timesPerWeek} kali seminggu</b>, selama <b>${weeks} minggu</b>. Tarif listrik <b>Rp${tarif}/kWh</b>. Berapa total biaya listriknya?`,
       unit: 'rupiah',
-      calc: () => Math.round(energiTotal*tarif)
+      calc: () => Math.round(energiTotal*tarif),
+      breakdown: () => `
+        1) Total jam pakai = ${hours} jam × ${timesPerWeek} kali/minggu × ${weeks} minggu = ${totalJam} jam<br>
+        2) Total energi = ${watt/1000} kW × ${totalJam} jam = ${energiTotal.toFixed(2)} kWh<br>
+        3) Biaya = ${energiTotal.toFixed(2)} kWh × Rp${tarif} = ${rp(energiTotal*tarif)}`
     };
-  },
-  // Pertanyaan energi (kWh), bukan biaya
-  () => {
+  }},
+  // Pertanyaan energi (kWh), bukan biaya — SEDANG
+  {level: 'sedang', gen: () => {
     const [a,b] = pickDistinct(appBank,2);
     const wa = pick(a.watts), wb = pick(b.watts);
     const ha = randInt(1,8), hb = randInt(1,8);
     const days = pick(dayBank);
-    const energiHari = (wa*ha + wb*hb)/1000;
+    const eA = wa*ha/1000, eB = wb*hb/1000;
+    const energiHari = eA + eB;
     return {
       text: `Sebuah rumah memakai <b>${a.label} ${wa} watt</b> selama <b>${ha} jam/hari</b> dan <b>${b.label} ${wb} watt</b> selama <b>${hb} jam/hari</b>. Berapa <b>total energi listrik (kWh)</b> yang dipakai selama <b>${days} hari</b>? (Jawab dalam kWh, boleh pakai koma)`,
       unit: 'kwh',
-      calc: () => Math.round(energiHari*days*10)/10
+      calc: () => Math.round(energiHari*days*10)/10,
+      breakdown: () => `
+        1) Energi ${a.label}/hari = ${wa/1000} kW × ${ha} jam = ${eA.toFixed(3)} kWh<br>
+        2) Energi ${b.label}/hari = ${wb/1000} kW × ${hb} jam = ${eB.toFixed(3)} kWh<br>
+        3) Total energi/hari = ${eA.toFixed(3)} + ${eB.toFixed(3)} = ${energiHari.toFixed(3)} kWh<br>
+        4) Energi ${days} hari = ${energiHari.toFixed(3)} × ${days} ≈ ${Math.round(energiHari*days*10)/10} kWh`
     };
-  },
-  // Pemakaian dalam menit, dikonversi ke jam
-  () => {
+  }},
+  // Pemakaian dalam menit, dikonversi ke jam — SEDANG
+  {level: 'sedang', gen: () => {
     const watt = pick([200,250,300]);
     const minutesPerDay = pick([30,45,60,90]);
     const days = pick(dayBank); const tarif = pick(tariffBank);
@@ -513,11 +561,16 @@ const templates = [
     return {
       text: `Pompa air berdaya <b>${watt} watt</b> menyala rata-rata <b>${minutesPerDay} menit setiap hari</b>. Jika tarif listrik <b>Rp${tarif}/kWh</b>, berapa biaya listrik pompa air itu selama <b>${days} hari</b>?`,
       unit: 'rupiah',
-      calc: () => Math.round(energiHari*days*tarif)
+      calc: () => Math.round(energiHari*days*tarif),
+      breakdown: () => `
+        1) Ubah menit ke jam: ${minutesPerDay} menit ÷ 60 = ${hoursPerDay.toFixed(2)} jam<br>
+        2) Energi per hari = ${watt/1000} kW × ${hoursPerDay.toFixed(2)} jam = ${energiHari.toFixed(3)} kWh<br>
+        3) Energi ${days} hari = ${energiHari.toFixed(3)} × ${days} = ${(energiHari*days).toFixed(2)} kWh<br>
+        4) Biaya = ${(energiHari*days).toFixed(2)} kWh × Rp${tarif} = ${rp(energiHari*days*tarif)}`
     };
-  },
-  // Bandingkan sebelum/sesudah ganti alat lebih hemat daya
-  () => {
+  }},
+  // Bandingkan sebelum/sesudah ganti alat lebih hemat daya — SULIT
+  {level: 'sulit', gen: () => {
     const a = pick(appBank); const wattLama = pick(a.watts);
     const wattBaru = Math.max(5, wattLama - pick([20,30,50]));
     const hours = randInt(2,8); const days = pick(dayBank); const tarif = pick(tariffBank);
@@ -526,23 +579,32 @@ const templates = [
     return {
       text: `Sebuah keluarga mengganti <b>${a.label}</b> lama berdaya <b>${wattLama} watt</b> dengan yang baru berdaya <b>${wattBaru} watt</b>. Alat ini dipakai <b>${hours} jam/hari</b> selama <b>${days} hari</b>, dengan tarif <b>Rp${tarif}/kWh</b>. Berapa <b>penghematan biaya listrik</b> setelah mengganti alat tersebut?`,
       unit: 'rupiah',
-      calc: () => Math.round(hemat)
+      calc: () => Math.round(hemat),
+      breakdown: () => `
+        1) Selisih daya = ${wattLama} W − ${wattBaru} W = ${selisihWatt} W = ${selisihWatt/1000} kW<br>
+        2) Energi yang dihemat/hari = ${selisihWatt/1000} kW × ${hours} jam = ${(selisihWatt*hours/1000).toFixed(3)} kWh<br>
+        3) Energi dihemat ${days} hari = ${(selisihWatt*hours/1000).toFixed(3)} × ${days} = ${(selisihWatt*hours/1000*days).toFixed(2)} kWh<br>
+        4) Penghematan biaya = ${(selisihWatt*hours/1000*days).toFixed(2)} kWh × Rp${tarif} = ${rp(hemat)}`
     };
-  },
-  // Menghitung total daya (watt) dari beberapa alat yang menyala bersamaan
-  () => {
+  }},
+  // Menghitung total daya (watt) dari beberapa alat yang menyala bersamaan — MUDAH
+  {level: 'mudah', gen: () => {
     const items = pickDistinct(appBank, randInt(2,3));
     const watts = items.map(a => pick(a.watts));
     const totalWatt = watts.reduce((s,w)=>s+w,0);
     const listText = items.map((a,i)=> `<b>${a.label} ${watts[i]} watt</b>`).join(', ');
+    const sumText = watts.join(' + ');
     return {
       text: `Jika ${listText} dinyalakan secara bersamaan, berapa <b>total daya listrik (watt)</b> yang digunakan pada saat itu?`,
       unit: 'watt',
-      calc: () => totalWatt
+      calc: () => totalWatt,
+      breakdown: () => `
+        Daya total = jumlah daya tiap alat yang menyala bersamaan (tidak perlu dikalikan waktu, karena ini menanyakan daya sesaat)<br>
+        Daya total = ${sumText} = ${totalWatt} watt`
     };
-  },
-  // Pemakaian hanya di akhir pekan (2 hari/minggu)
-  () => {
+  }},
+  // Pemakaian hanya di akhir pekan (2 hari/minggu) — SEDANG
+  {level: 'sedang', gen: () => {
     const a = pick(appBank); const watt = pick(a.watts); const hours = randInt(2,8);
     const weeks = pick([2,4]); const tarif = pick(tariffBank);
     const totalJam = hours*2*weeks; // 2 hari/minggu
@@ -550,9 +612,14 @@ const templates = [
     return {
       text: `Sebuah <b>${a.label} ${watt} watt</b> hanya dipakai saat akhir pekan (Sabtu & Minggu) selama <b>${hours} jam/hari</b>, selama <b>${weeks} minggu</b>. Tarif listrik <b>Rp${tarif}/kWh</b>. Berapa total biaya listriknya?`,
       unit: 'rupiah',
-      calc: () => Math.round(energiTotal*tarif)
+      calc: () => Math.round(energiTotal*tarif),
+      breakdown: () => `
+        1) Jumlah hari pakai = 2 hari/minggu × ${weeks} minggu = ${2*weeks} hari<br>
+        2) Total jam pakai = ${hours} jam × ${2*weeks} hari = ${totalJam} jam<br>
+        3) Total energi = ${watt/1000} kW × ${totalJam} jam = ${energiTotal.toFixed(2)} kWh<br>
+        4) Biaya = ${energiTotal.toFixed(2)} kWh × Rp${tarif} = ${rp(energiTotal*tarif)}`
     };
-  },
+  }},
 ];
 
 let currentCase = null;
@@ -654,17 +721,32 @@ function handleTimeUp(){
   score = Math.max(0, score - 5);
   fb.className = 'feedback bad';
   fb.textContent = `Waktu habis! Jawaban yang benar adalah ${correctLabel}. Skor -5. Lanjut ke soal berikutnya...`;
+  const bd = document.getElementById('breakdownBox');
+  bd.innerHTML = `<div class="breakdown-title">Pembahasan</div>${currentCase.breakdown()}`;
+  bd.classList.add('show');
   document.getElementById('answerInput').disabled = true;
   updateScorePanel();
 
   setTimeout(()=>{
     document.getElementById('answerInput').disabled = false;
     loadCase();
-  }, 2500);
+  }, 6000);
 }
 
 function startSession(){
-  sessionQuestions = shuffle(templates).slice(0, MAX_QUESTIONS).map(fn => fn());
+  const order = {mudah:0, sedang:1, sulit:2};
+  const byLevel = {mudah:[], sedang:[], sulit:[]};
+  templates.forEach(t => byLevel[t.level].push(t));
+  const sorted = [
+    ...shuffle(byLevel.mudah),
+    ...shuffle(byLevel.sedang),
+    ...shuffle(byLevel.sulit),
+  ];
+  sessionQuestions = sorted.slice(0, MAX_QUESTIONS).map(t => {
+    const q = t.gen();
+    q.level = t.level;
+    return q;
+  });
   questionIndex = 0;
   correctCount = 0; total = 0; score = 0;
   updateScorePanel();
@@ -678,13 +760,17 @@ function loadCase(){
     return;
   }
   currentCase = sessionQuestions[questionIndex];
-  document.getElementById('caseProgress').textContent = `Soal ${questionIndex+1} dari ${sessionQuestions.length}`;
+  const levelLabel = {mudah:'Mudah', sedang:'Sedang', sulit:'Sulit'}[currentCase.level] || '';
+  document.getElementById('caseProgress').textContent = `Soal ${questionIndex+1} dari ${sessionQuestions.length} · ${levelLabel}`;
+  document.getElementById('caseProgress').className = 'case-progress level-' + currentCase.level;
   document.getElementById('caseText').innerHTML = currentCase.text;
   document.getElementById('answerInput').placeholder = currentCase.unit === 'kwh' ? 'Jawabanmu, mis. 12,5 (kWh)' : (currentCase.unit === 'watt' ? 'Jawabanmu, mis. 450 (watt)' : 'Jawabanmu, mis. 22500 atau 22.500');
   document.getElementById('answerInput').value = '';
   document.getElementById('answerRow').style.display = 'flex';
   document.getElementById('feedbackBox').className = 'feedback';
   document.getElementById('feedbackBox').textContent = '';
+  document.getElementById('breakdownBox').className = 'breakdown-box';
+  document.getElementById('breakdownBox').innerHTML = '';
   document.getElementById('nextCase').classList.remove('show');
   document.getElementById('nextCase').textContent = 'Soal berikutnya →';
   document.getElementById('answerInput').disabled = false;
@@ -703,6 +789,8 @@ function showSummary(){
   document.getElementById('answerRow').style.display = 'none';
   document.getElementById('feedbackBox').className = 'feedback';
   document.getElementById('feedbackBox').textContent = '';
+  document.getElementById('breakdownBox').className = 'breakdown-box';
+  document.getElementById('breakdownBox').innerHTML = '';
   document.getElementById('nextCase').classList.add('show');
   document.getElementById('nextCase').textContent = '🔄 Main Lagi (10 soal baru)';
 }
@@ -739,16 +827,20 @@ function submitCurrentAnswer(){
     score = Math.min(100, score + 10);
     fb.className = 'feedback ok';
     fb.textContent = `Tepat! Jawaban yang benar adalah ${correctLabel}. Skor +10.`;
+    document.getElementById('breakdownBox').innerHTML = `<div class="breakdown-title">Pembahasan</div>${currentCase.breakdown()}`;
+    document.getElementById('breakdownBox').classList.add('show');
     updateScorePanel();
     document.getElementById('nextCase').classList.add('show');
   } else {
     score = Math.max(0, score - 5);
     fb.className = 'feedback bad';
-    fb.textContent = `Belum tepat. Jawaban yang benar adalah ${correctLabel}. Ingat: Energi (kWh) = Daya (kW) × waktu (jam), lalu kalikan dengan tarif dan jumlah hari. Skor -5. Lanjut ke soal berikutnya...`;
+    fb.textContent = `Belum tepat. Jawaban yang benar adalah ${correctLabel}. Skor -5. Lanjut ke soal berikutnya...`;
+    document.getElementById('breakdownBox').innerHTML = `<div class="breakdown-title">Pembahasan</div>${currentCase.breakdown()}`;
+    document.getElementById('breakdownBox').classList.add('show');
     updateScorePanel();
     setTimeout(()=>{
       loadCase();
-    }, 2500);
+    }, 6000);
   }
 }
 
